@@ -6,7 +6,7 @@ enum Router: URLRequestConvertible {
     static var token: String?
     static var apiKey: String?
     static var operatorId: String?
-    static var endpoint: String = defaultEndpoint
+    static var endpoint: String = "https://api-sandbox.soracom.io/v1" //defaultEndpoint
     
     case Auth([String: AnyObject])
     case Subscribers([String: AnyObject])
