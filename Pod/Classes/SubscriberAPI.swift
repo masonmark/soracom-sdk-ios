@@ -2,6 +2,42 @@ import Foundation
 import Alamofire
 
 extension Soracom {
+  
+  public class func registerSubscriber(imsi: String, registrationSecret: String,  resultHandler: ((SoracomAPIResult) -> ()) ) {
+    
+    let requestValues = ["imsi": imsi, "registrationSecret": registrationSecret]
+    
+    Alamofire.request(Router.RegisterSubscriber(imsi, requestValues)).responseJSON { response in
+      
+      // Mason 2016-03-06: FIXME: This is temporary, experimental code!
+      
+      let HTTPStatus  = response.response?.statusCode
+      let payload     = response.result.value as? Dictionary<String, AnyObject>
+      var result      = SoracomAPIResult(HTTPStatus: HTTPStatus, payload: payload)
+      
+      print("Here is the REGISTER SUBSCRIBER レスポンス bro:")
+      print(result)
+      
+      // Mason 2016-03-06: My experimentation has so far revealed different failure modes:
+      
+      if let error = response.result.error {
+        // Failure mode 1: network offline, or other underlying Cocoa error occurred. In this case, response.response may be nil.
+        result.clientError = error
+      } else if result.hasError {
+        // do nothing, err is already set
+      } else {
+        if let value = response.result.value as? NSDictionary {
+          print("Registered subscriber successfully. (w00t w00t)")
+          print(value)
+        }
+      }
+      
+      resultHandler(result)
+    }
+  }
+
+  
+  
     public class func subscribers(
         tagName: String? = nil,
         tagValue: String? = nil,

@@ -11,6 +11,7 @@ enum Router: URLRequestConvertible {
     case Auth([String: AnyObject])
     case Subscribers([String: AnyObject])
     case SubscriberUpdateSpeedClass(String, [String: AnyObject])
+    case RegisterSubscriber(String, [String: AnyObject])
     
     var method: Alamofire.Method {
         switch self {
@@ -19,6 +20,8 @@ enum Router: URLRequestConvertible {
         case .Subscribers:
             return .GET
         case .SubscriberUpdateSpeedClass:
+            return .POST
+        case .RegisterSubscriber:
             return .POST
         }
     }
@@ -31,6 +34,8 @@ enum Router: URLRequestConvertible {
             return "/subscribers"
         case .SubscriberUpdateSpeedClass(let imsi, _):
             return "/subscribers/\(imsi)/update_speed_class"
+        case .RegisterSubscriber(let imsi, _):
+            return "/subscribers/\(imsi)/register"
         }
     }
     
@@ -63,7 +68,9 @@ enum Router: URLRequestConvertible {
         case .Subscribers(let parameters):
             return Alamofire.ParameterEncoding.URL.encode(mutableURLRequest, parameters: parameters).0
         case .SubscriberUpdateSpeedClass(_, let parameters):
-            return Alamofire.ParameterEncoding.JSON.encode(mutableURLRequest, parameters: parameters).0
+          return Alamofire.ParameterEncoding.JSON.encode(mutableURLRequest, parameters: parameters).0
+        case .RegisterSubscriber(_, let parameters):
+          return Alamofire.ParameterEncoding.JSON.encode(mutableURLRequest, parameters: parameters).0
         }
     }
 }
