@@ -16,26 +16,37 @@ import Foundation
 
 public struct SoracomAPIResult {
     
-    init(HTTPStatus: Int?, payload: Dictionary<String, AnyObject>?, expectedHTTPStatus: Int = 200, expectedResponseKeys: [String] = []) {
-        self.HTTPStatus           = HTTPStatus
-        self.payload              = payload
-        self.expectedHTTPStatus   = expectedHTTPStatus
-        self.expectedResponseKeys = expectedResponseKeys
+    init(request: APIRequest, response: NSHTTPURLResponse?, data: NSData? = nil) {
+        self.request  = request
+        self.response = response
+        self.data     = data
         
         APIError = getErrorIfHTTPStatusIsUnexpected() ?? getErrorIfExpectedKeysAreMissing()
     }
     
-    /// The HTTP status expected to be returned by the underlying HTTP request on success.
-    let expectedHTTPStatus: Int
+    /// The originating `APIRequest` instance, for which the receiver is a matched pair. The request has the details about what was requested and what the expectations were, while the result has the details of what actually came back from the sever (or what error occurred).
+    let request: APIRequest
     
-    /// The actual HTTP status returned by the underlying HTTP request.
-    let HTTPStatus: Int?
+    /// The underlying system response object (which exposes some details like HTTP headers, HTTP version, etc). This object should always be present upon success, but may be nil when some kind of error has occurred.
+    var response: NSHTTPURLResponse?
+    
+    /// The raw data received with the response.
+    var data: NSData?
+    
+    /// Returns `self.data` as a UTF-8 string.
+    var text: String? {
+        return data != nil ? String(data: data!, encoding: NSUTF8StringEncoding) : nil
+    }
+    
+    /// The actual HTTP status returned by the underlying HTTP request. May be nil, e.g. if error happened before HTTP response was received.
+    var HTTPStatus: Int? {
+        return response?.statusCode
+    }
     
     /// The payload (the JSON payload converted to native dictionary).
-    let payload: Dictionary<String, AnyObject>?
-    
-    /// An array of keys indicating the values the response payload **must** have to be considered successful.
-    let expectedResponseKeys: [String]
+    var payload: Dictionary<String, JSON>? {
+        return data != nil ? JSON(data: data!).dictionaryValue : nil
+    }
     
     /// If the API returns an error, it will be stored in this property.
     var APIError: SoracomAPIError?
@@ -49,25 +60,25 @@ public struct SoracomAPIResult {
     }
     
     /// Returns a value from the API response payload, or nil if not present.
-    subscript(key: String) -> AnyObject? {
+    subscript(key: String) -> JSON? {
         return payload?[key]
     }
     
     /// Internal func to compare the actual `HTTPStatus` with the `expectedHTTPStatus`, and construct and return an appropriate `SoracomAPIError` if they don't match. Returns nil if `HTTPStatus == expectedHTTPStatus`.
     func getErrorIfHTTPStatusIsUnexpected() -> SoracomAPIError? {
-        guard HTTPStatus != expectedHTTPStatus else {
+        guard HTTPStatus != request.expectedHTTPStatus else {
             return nil
         }
         
         // The API reported an error. Let's see if we can parse this as a regular API error response:
-        let c = self["code"] as? String
-        let m = self["message"] as? String
+        let c = self["code"]?.stringValue
+        let m = self["message"]?.stringValue
         
         if c != nil {
             return SoracomAPIError(errorCode: c, message: m)
         } else {
             // Hmm. The server didn't return the [code:, message:] err result that we understand, so make a generic error instead:
-            return SoracomAPIError(errorCode: "CLI0666", message: "got HTTP status \(HTTPStatus), but expected \(expectedHTTPStatus)")
+            return SoracomAPIError(errorCode: "CLI0666", message: "got HTTP status \(HTTPStatus), but expected \(request.expectedHTTPStatus)")
             // FIXME: See if we can add real err codes for client-side errs, that don't potentially conflict with API-side err codes.
         }
     }
@@ -75,7 +86,7 @@ public struct SoracomAPIResult {
     /// Internal func to check for missing keys and return an appropriate SoracomAPIError if required keys are missing. Returns nil if no keys are missing.
     func getErrorIfExpectedKeysAreMissing() -> SoracomAPIError? {
         var missingKeys: [String] = []
-        for key in expectedResponseKeys {
+        for key in request.expectedResponseKeys {
             if payload?[key] == nil {
                 missingKeys.append(key)
             }
